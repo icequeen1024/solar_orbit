@@ -4,16 +4,7 @@
 
 `SPEC.md` is the product source of truth. Read it completely before changing this repository.
 
-The repository is currently in a **documentation-only phase**. The present task authorizes only the creation or revision of `SPEC.md` and `agent.md`, followed by committing and pushing those documents. It does not authorize implementation.
-
-Until the user explicitly starts an implementation task, do not:
-
-- create application or simulation source code;
-- create a package manifest, lockfile, build configuration, test scaffold, generated astronomy data, or dependency installation;
-- add UI mock implementations, proof-of-concept calculations, or executable snippets to the repository;
-- interpret the successful documentation push as permission to begin coding.
-
-After the documentation work is pushed, stop and wait for explicit user direction.
+The user explicitly authorized implementation after the documentation phase. The current implementation target is a fully static GitHub Pages site. Do not introduce ChatGPT Sites, Cloudflare Workers, server-only routes, databases, authentication, or other infrastructure that GitHub Pages cannot serve.
 
 ## Fixed requirements
 
@@ -22,8 +13,9 @@ Do not change these decisions without asking the user and revising `SPEC.md` fir
 - include only the Sun and eight planets;
 - use a two-dimensional, top-down presentation;
 - target desktop web browsers first;
+- build and deploy as a static GitHub Pages project site;
 - support January 1, 2000 through January 1, 4000;
-- use a heliocentric Keplerian model projected onto the ecliptic plane;
+- use the NASA/JPL Table 2a/2b heliocentric Keplerian model projected onto the ecliptic plane;
 - compress orbital distances for readability;
 - preserve true relative mean diameters for the Sun and all planets under one shared scale;
 - use equally styled planet labels with leader arrows;
@@ -45,7 +37,7 @@ Minor reversible implementation details may be chosen later when they do not con
 - Keep the body-size scale separate from the orbital-distance scale.
 - Do not individually inflate small planet bodies; use labels, arrows, and enlarged invisible hit targets.
 - Treat the Sun as the origin and exclude it from planet selection and nearest-planet statistics.
-- Use a documented orbital-element source with appropriate date coverage. Do not invent coefficients or silently extrapolate them.
+- Use the documented NASA/JPL Table 2a/2b orbital elements. Preserve the visible disclosure that their fitted rates are extrapolated from 3000 to 4000 CE.
 - Make percentage calculations reproducible, versioned, and independent of rendering frame rate.
 - Do not market the Keplerian approximation as observatory-, navigation-, or mission-grade accuracy.
 
@@ -82,12 +74,13 @@ These rules become relevant only after the user explicitly authorizes implementa
 - Before reporting completion, run the relevant validation, confirm the intended files are committed, and confirm the remote branch contains the commit.
 - Never place credentials, tokens, private keys, or machine-specific secrets in the repository.
 
-## Documentation-phase definition of done
+## Implementation-phase definition of done
 
 For the current task, completion means:
 
-1. `SPEC.md` reflects every product decision supplied by the user.
-2. `agent.md` enforces the no-code gate and preserves the specification's invariants.
-3. No application, simulation, build, dependency, test, or generated-data files have been added.
-4. The two documentation files are committed and pushed to the requested GitHub repository.
-5. The working tree is clean after the push.
+1. The static application implements the approved behaviors in `SPEC.md`.
+2. The production build contains no server runtime or server-only dependency.
+3. Automated scientific, interaction, and build checks pass.
+4. A GitHub Actions workflow deploys the built `dist` directory to GitHub Pages.
+5. The implementation is committed and pushed to the requested GitHub repository.
+6. The working tree is clean after the push.

@@ -1,0 +1,192 @@
+{
+  "model": {
+    "id": "jpl-keplerian-table-2-v1",
+    "title": "NASA/JPL approximate Keplerian elements",
+    "sourceUrl": "https://ssd.jpl.nasa.gov/planets/approx_pos.html",
+    "fittedThroughYear": 3000,
+    "productEndYear": 4000,
+    "extrapolationDisclosure": "NASA/JPL's element fit ends at 3000 CE. Secular rates are extrapolated from 3000 to 4000 CE, so later positions are illustrative."
+  },
+  "interval": {
+    "start": "2000-01-01T00:00:00.000Z",
+    "endExclusive": "4000-01-01T00:00:00.000Z"
+  },
+  "method": {
+    "sampleHours": 6,
+    "transitionToleranceMinutes": 1,
+    "samples": 2921941,
+    "detectedTransitions": 45363,
+    "rounding": "largest remainder to one decimal place",
+    "convergence": {
+      "comparisonSampleHours": 3,
+      "maximumDisplayedDifference": 0,
+      "passed": true
+    }
+  },
+  "percentages": {
+    "mercury": [
+      {
+        "id": "venus",
+        "percentage": 72.9
+      },
+      {
+        "id": "earth",
+        "percentage": 25.7
+      },
+      {
+        "id": "mars",
+        "percentage": 1.4
+      }
+    ],
+    "venus": [
+      {
+        "id": "mercury",
+        "percentage": 66.4
+      },
+      {
+        "id": "earth",
+        "percentage": 27.3
+      },
+      {
+        "id": "mars",
+        "percentage": 6.3
+      }
+    ],
+    "earth": [
+      {
+        "id": "mercury",
+        "percentage": 46.9
+      },
+      {
+        "id": "venus",
+        "percentage": 36.8
+      },
+      {
+        "id": "mars",
+        "percentage": 16.3
+      }
+    ],
+    "mars": [
+      {
+        "id": "mercury",
+        "percentage": 34.4
+      },
+      {
+        "id": "earth",
+        "percentage": 33.4
+      },
+      {
+        "id": "venus",
+        "percentage": 32.2
+      }
+    ],
+    "jupiter": [
+      {
+        "id": "mars",
+        "percentage": 35.2
+      },
+      {
+        "id": "earth",
+        "percentage": 25.6
+      },
+      {
+        "id": "venus",
+        "percentage": 19.2
+      },
+      {
+        "id": "mercury",
+        "percentage": 14.5
+      },
+      {
+        "id": "saturn",
+        "percentage": 5.5
+      }
+    ],
+    "saturn": [
+      {
+        "id": "jupiter",
+        "percentage": 36.6
+      },
+      {
+        "id": "mars",
+        "percentage": 24.6
+      },
+      {
+        "id": "earth",
+        "percentage": 17.1
+      },
+      {
+        "id": "venus",
+        "percentage": 12.2
+      },
+      {
+        "id": "mercury",
+        "percentage": 8.8
+      },
+      {
+        "id": "uranus",
+        "percentage": 0.7
+      }
+    ],
+    "uranus": [
+      {
+        "id": "saturn",
+        "percentage": 31.4
+      },
+      {
+        "id": "jupiter",
+        "percentage": 24.1
+      },
+      {
+        "id": "neptune",
+        "percentage": 16.9
+      },
+      {
+        "id": "mars",
+        "percentage": 11.6
+      },
+      {
+        "id": "earth",
+        "percentage": 7.3
+      },
+      {
+        "id": "venus",
+        "percentage": 5.2
+      },
+      {
+        "id": "mercury",
+        "percentage": 3.5
+      }
+    ],
+    "neptune": [
+      {
+        "id": "uranus",
+        "percentage": 34.3
+      },
+      {
+        "id": "saturn",
+        "percentage": 26.9
+      },
+      {
+        "id": "jupiter",
+        "percentage": 19.2
+      },
+      {
+        "id": "mars",
+        "percentage": 8.5
+      },
+      {
+        "id": "earth",
+        "percentage": 5.2
+      },
+      {
+        "id": "venus",
+        "percentage": 3.4
+      },
+      {
+        "id": "mercury",
+        "percentage": 2.5
+      }
+    ]
+  }
+}

@@ -2,7 +2,7 @@
 
 Version: 1.0
 
-Status: Ready for review; implementation is not authorized by this document
+Status: Approved; implementation in progress
 
 Date: July 20, 2026
 
@@ -19,8 +19,9 @@ The experience should feel astronomical and believable while remaining readable.
 | Bodies in scope | The Sun, Mercury, Venus, Earth, Mars, Jupiter, Saturn, Uranus, and Neptune |
 | Presentation | Two-dimensional, top-down view of the ecliptic plane |
 | Primary platform | Desktop web browser |
+| Hosting | Static deployment on GitHub Pages at the `solar_orbit` project path |
 | Analysis range | January 1, 2000 through January 1, 4000 |
-| Position model | Heliocentric Keplerian orbital model, projected into two dimensions |
+| Position model | NASA/JPL approximate heliocentric Keplerian elements (Table 2a/2b), projected into two dimensions |
 | Distance presentation | Compressed for readability; not shown at literal distance scale |
 | Body presentation | All nine bodies use one uniform visual size scale so their diameter ratios remain physically proportional; this includes the Sun |
 | Labels | Equal typography and visual weight, with a leader arrow pointing to each body's position |
@@ -52,8 +53,8 @@ The experience should feel astronomical and believable while remaining readable.
 ### 5.1 Coordinates and orbital motion
 
 - The Sun is the fixed origin of a heliocentric coordinate system.
-- Each planet follows a Keplerian orbit calculated from published orbital elements and secular rates from a documented astronomical source.
-- The implementation must use a source whose stated range covers January 1, 2000 through January 1, 4000, or document and visibly disclose any extrapolation.
+- Each planet follows a Keplerian orbit calculated from the NASA/JPL Solar System Dynamics approximate elements and secular rates in Table 2a/2b.
+- The source fit is valid through 3000 CE. The product extrapolates its secular rates from 3000 through 4000 CE and must visibly disclose that positions in the extrapolated period are illustrative.
 - Three-dimensional orbital positions are projected onto the ecliptic plane for the two-dimensional display and distance calculations.
 - Positions must be continuous between displayed dates; advancing time must not visibly jump between coarse precomputed samples.
 - All calculations use UTC and the proleptic Gregorian calendar. Leap seconds are outside the product's required precision.
@@ -222,12 +223,13 @@ Changing direction or speed must not change the displayed instant. Jumping to a 
 
 This section guides later implementation but does not authorize coding.
 
-- TypeScript and React for application state, panels, and controls.
+- TypeScript, React, and Vite for a fully static GitHub Pages application.
 - HTML Canvas for the animated orbital scene and connection line.
 - A pure, separately testable astronomy module for positions, distances, and nearest-neighbor decisions.
 - A build-time or worker-based analysis path for deterministic percentage generation.
 - Versioned static data for orbital elements, source attribution, and precomputed percentages.
 - Accessible HTML controls and text content layered around the canvas; do not make the canvas the only interaction surface.
+- Repository-relative asset paths and a GitHub Actions Pages workflow; no application server or Cloudflare runtime.
 
 ## 13. Acceptance criteria
 
@@ -256,6 +258,5 @@ These details may be decided during a later design phase without changing the pr
 - exact power or logarithmic function used for orbital-distance compression;
 - precise responsive behavior below the desktop target;
 - whether a shareable state URL is added after the initial release;
-- the final orbital-element source, provided it satisfies the coverage, attribution, and disclosure requirements above.
 
 Any decision that changes the bodies, date range, dimensionality, relative-size rule, nearest definition, or percentage meaning requires an explicit specification revision before implementation.
