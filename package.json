@@ -9,7 +9,7 @@
   },
   "scripts": {
     "dev": "vite",
-    "build": "tsc --noEmit && vite build",
+    "build": "tsc --noEmit && vite build && node scripts/sync-pages-build.mjs",
     "preview": "vite preview",
     "test": "node --experimental-strip-types --test tests/*.test.ts",
     "generate:statistics": "node --experimental-strip-types scripts/generate-nearest.ts"

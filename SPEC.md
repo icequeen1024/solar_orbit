@@ -19,7 +19,7 @@ The experience should feel astronomical and believable while remaining readable.
 | Bodies in scope | The Sun, Mercury, Venus, Earth, Mars, Jupiter, Saturn, Uranus, and Neptune |
 | Presentation | Two-dimensional, top-down view of the ecliptic plane |
 | Primary platform | Desktop web browser |
-| Hosting | Static deployment on GitHub Pages at the `solar_orbit` project path |
+| Hosting | Static deployment on GitHub Pages at the `solar_orbit` project path, compatible with Actions artifacts and branch-root publishing |
 | Analysis range | January 1, 2000 through January 1, 4000 |
 | Position model | NASA/JPL approximate heliocentric Keplerian elements (Table 2a/2b), projected into two dimensions |
 | Distance presentation | Compressed for readability; not shown at literal distance scale |

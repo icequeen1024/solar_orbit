@@ -25,7 +25,7 @@ npm install
 npm run dev
 ```
 
-The project-site development URL is `http://localhost:5173/solar_orbit/`.
+The source development URL is `http://localhost:5173/solar_orbit/dev.html`.
 
 ## Verification
 
@@ -47,7 +47,9 @@ also compare the six-hour results against a three-hour analysis.
 
 Pushing to `main` runs `.github/workflows/deploy-pages.yml`, which tests and
 builds the static Vite application before publishing `dist` to GitHub Pages.
-In the repository settings, Pages must use **GitHub Actions** as its source.
+The build also synchronizes its production entry point and assets at the
+repository root, so the site remains compatible with branch-based Pages
+publishing. GitHub Actions remains the preferred Pages source.
 
 The configured project URL is:
 

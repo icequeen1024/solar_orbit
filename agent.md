@@ -14,6 +14,7 @@ Do not change these decisions without asking the user and revising `SPEC.md` fir
 - use a two-dimensional, top-down presentation;
 - target desktop web browsers first;
 - build and deploy as a static GitHub Pages project site;
+- keep both GitHub Actions artifact deployment and branch-root Pages publishing functional;
 - support January 1, 2000 through January 1, 4000;
 - use the NASA/JPL Table 2a/2b heliocentric Keplerian model projected onto the ecliptic plane;
 - compress orbital distances for readability;
