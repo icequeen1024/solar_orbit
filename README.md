@@ -18,11 +18,11 @@ which other planet is nearest at that instant and over the full analysis range.
 
 ## Local development
 
-Requires Node.js 24 and pnpm 11.
+Requires Node.js 24 and npm 11.
 
 ```sh
-pnpm install
-pnpm dev
+npm install
+npm run dev
 ```
 
 The project-site development URL is `http://localhost:5173/solar_orbit/`.
@@ -30,14 +30,14 @@ The project-site development URL is `http://localhost:5173/solar_orbit/`.
 ## Verification
 
 ```sh
-pnpm test
-pnpm build
+npm test
+npm run build
 ```
 
 Rebuild the committed nearest-planet statistics with:
 
 ```sh
-pnpm generate:statistics
+npm run generate:statistics
 ```
 
 Use `node --experimental-strip-types scripts/generate-nearest.ts --converge` to
