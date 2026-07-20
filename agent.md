@@ -71,6 +71,7 @@ These rules become relevant only after the user explicitly authorizes implementa
 - Do not use destructive Git commands or rewrite shared history.
 - Keep unrelated changes out of commits.
 - Use concise commit messages that state the outcome.
+- Every repository change, including documentation-only changes, must be committed and pushed to GitHub before the task is considered complete.
 - Before reporting completion, run the relevant validation, confirm the intended files are committed, and confirm the remote branch contains the commit.
 - Never place credentials, tokens, private keys, or machine-specific secrets in the repository.
 
