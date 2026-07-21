@@ -23,7 +23,7 @@ Do not change these decisions without asking the user and revising `SPEC.md` fir
 - select planets, not the Sun;
 - continuously connect the selected planet to its physically nearest other planet;
 - provide forward, reverse, pause, presets, a custom multiplier, and date/time jumping;
-- show every planet with a nonzero nearest-duration percentage over the fixed analysis interval.
+- start all seven alternatives at 0.0% and update cumulative nearest-duration percentages from January 1, 2000 through the displayed instant.
 
 ## Clarification rule
 
@@ -59,7 +59,7 @@ These rules become relevant only after the user explicitly authorizes implementa
 
 - Unit-test known orbital-position fixtures against the selected source and stated tolerances.
 - Unit-test physical distance and nearest-neighbor selection independently of display transforms.
-- Verify percentage convergence and ensure displayed values total exactly 100.0%.
+- Verify percentage convergence, the all-zero start state, and totals of exactly 100.0% after simulated time has elapsed.
 - Test the inclusive display boundaries and half-open percentage interval.
 - Test forward and reverse playback at every preset and with valid and invalid custom values.
 - Test selection by visible body, label, leader arrow, keyboard, and accessible planet list.

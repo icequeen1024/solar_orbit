@@ -2,7 +2,7 @@
 
 A two-dimensional planetary proximity atlas for the Sun and eight planets. Move
 through time from January 1, 2000 to January 1, 4000, select a planet, and see
-which other planet is nearest at that instant and over the full analysis range.
+which other planet is nearest at that instant and cumulatively since the start.
 
 ## Features
 
@@ -11,8 +11,9 @@ which other planet is nearest at that instant and over the full analysis range.
 - True relative body diameters under one shared visual scale.
 - Forward and reverse playback, five speed presets, custom multipliers, and UTC
   date jumping.
-- Six-hour nearest-planet analysis with transition refinement to one simulated
-  minute.
+- Live cumulative nearest-duration percentages that begin at zero, use a
+  six-hour transition timeline refined to one simulated minute, and respond to
+  forward playback, reverse playback, and date jumps.
 - Keyboard-accessible planet selection and controls.
 - Device-local persistence for the selected planet, date, speed, and camera.
 

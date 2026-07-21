@@ -27,9 +27,13 @@ import {
   type PlanetPosition,
   type Point3,
 } from "../lib/astronomy";
+import {
+  percentagesAt,
+  prepareNearestTimelines,
+  type NearestTimelines,
+} from "../lib/nearest-statistics";
 import { playbackDirectionFromBoundary } from "../lib/playback";
 
-type PercentageEntry = { id: PlanetId; percentage: number };
 type StatisticsFile = {
   method: {
     sampleHours: number;
@@ -37,7 +41,7 @@ type StatisticsFile = {
     samples: number;
     detectedTransitions: number;
   };
-  percentages: Record<PlanetId, PercentageEntry[]>;
+  timelines: NearestTimelines;
 };
 
 type Camera = { zoom: number; panX: number; panY: number };
@@ -49,7 +53,8 @@ type HitRegion = {
   line: { start: ScreenPoint; end: ScreenPoint };
 };
 
-const statistics = nearestStatisticsJson as StatisticsFile;
+const statistics = nearestStatisticsJson as unknown as StatisticsFile;
+const preparedTimelines = prepareNearestTimelines(statistics.timelines);
 const STORAGE_KEY = "solar-orbit-state-v1";
 const MAX_CUSTOM_MULTIPLIER = 1_000_000_000_000;
 const YEAR_SECONDS = 365.25 * 24 * 60 * 60;
@@ -110,6 +115,26 @@ function toDateTimeInput(dateMs: number) {
   ).padStart(2, "0")}-${String(date.getUTCDate()).padStart(2, "0")}T${String(
     date.getUTCHours(),
   ).padStart(2, "0")}:${String(date.getUTCMinutes()).padStart(2, "0")}`;
+}
+
+function formatPercentageRange(dateMs: number) {
+  if (dateMs <= RANGE_START_MS) return "Starting at Jan 1, 2000";
+  const date = new Date(dateMs);
+  const month = [
+    "Jan",
+    "Feb",
+    "Mar",
+    "Apr",
+    "May",
+    "Jun",
+    "Jul",
+    "Aug",
+    "Sep",
+    "Oct",
+    "Nov",
+    "Dec",
+  ][date.getUTCMonth()];
+  return `Jan 1, 2000–${month} ${date.getUTCDate()}, ${date.getUTCFullYear()}`;
 }
 
 function parseDateTimeInput(value: string) {
@@ -547,6 +572,10 @@ export default function App() {
   const nearestId = nearestResult?.planet.id ?? null;
   const distance = nearestResult ? formatDistance(nearestResult.distanceAu) : null;
   const selectedPlanet = selected ? getPlanet(selected) : null;
+  const livePercentages = useMemo(
+    () => (selected ? percentagesAt(preparedTimelines[selected], dateMs) : []),
+    [dateMs, selected],
+  );
 
   useEffect(() => {
     try {
@@ -807,8 +836,8 @@ export default function App() {
 
           <div className="percentage-heading">
             <div>
-              <p>Closest over time</p>
-              <span>Jan 2000–Jan 4000</span>
+              <p>Nearest since start</p>
+              <span>{formatPercentageRange(dateMs)}</span>
             </div>
             <button type="button" onClick={() => setMethodsOpen(true)}>
               How?
@@ -816,7 +845,7 @@ export default function App() {
           </div>
 
           <ol className="percentage-list">
-            {statistics.percentages[selected].map((entry) => (
+            {livePercentages.map((entry) => (
               <li key={entry.id}>
                 <div className="percentage-list__row">
                   <span className="percentage-list__planet">
@@ -1026,10 +1055,13 @@ export default function App() {
                 <span>03</span>
                 <h3>Time percentages</h3>
                 <p>
-                  The full 2000–4000 interval was sampled every {statistics.method.sampleHours}
-                  {" "}hours across {statistics.method.samples.toLocaleString()} samples.
-                  Detected changes were refined to within {statistics.method.transitionToleranceMinutes}
-                  {" "}minute, then rounded to total exactly 100.0%.
+                  A nearest-neighbor timeline from 2000–4000 was sampled every{" "}
+                  {statistics.method.sampleHours} hours across{" "}
+                  {statistics.method.samples.toLocaleString()} samples. Changes were
+                  refined to within {statistics.method.transitionToleranceMinutes} minute.
+                  The panel totals time from Jan 1, 2000 to the displayed instant, so it
+                  grows forward, rewinds in reverse, and updates after a date jump. Values
+                  start at zero and then round to total exactly 100.0%.
                 </p>
               </article>
               <article className="methods-warning">

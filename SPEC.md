@@ -8,7 +8,7 @@ Date: July 20, 2026
 
 ## 1. Product summary
 
-Solar Orbit is a desktop-first, two-dimensional web experience that shows the Sun and the eight planets moving through a readable representation of the Solar System. A user can change the simulated flow of time, jump to a date, select a planet, see which other planet is physically nearest to it, and review which planets are nearest to it—and for what percentage of time—over a fixed 2,000-year analysis period.
+Solar Orbit is a desktop-first, two-dimensional web experience that shows the Sun and the eight planets moving through a readable representation of the Solar System. A user can change the simulated flow of time, jump to a date, select a planet, see which other planet is physically nearest to it, and review the cumulative percentage of time each other planet has been nearest from January 1, 2000 through the displayed instant.
 
 The experience should feel astronomical and believable while remaining readable. Orbital distances may therefore be compressed for display, but planet and Sun diameters must retain their real proportions under one shared body-size scale. Labels and leader arrows make small bodies findable.
 
@@ -27,14 +27,14 @@ The experience should feel astronomical and believable while remaining readable.
 | Labels | Equal typography and visual weight, with a leader arrow pointing to each body's position |
 | Selection | Planets are selectable; the Sun is displayed but is not a selectable planet or a nearest-planet candidate |
 | Nearest connection | Updates continuously while simulated time advances |
-| Historical percentages | Show every other planet that is nearest for a nonzero portion of the fixed analysis range |
+| Cumulative percentages | Start all seven alternatives at 0.0% on January 1, 2000 and update their nearest-duration shares through the displayed instant |
 
 ## 3. Goals
 
 - Make the changing spatial relationships among the eight planets easy to explore.
 - Let users move through two millennia in either direction at useful speeds.
 - Clearly identify the nearest planet to a selected planet at the displayed instant.
-- Explain, with deterministic percentages, how often each other planet is the selected planet's nearest neighbor over the fixed range.
+- Explain, with deterministic live percentages, how often each other planet has been the selected planet's nearest neighbor since January 1, 2000.
 - Preserve truthful relative body diameters while using labels and display scaling to keep the system understandable.
 - Clearly distinguish physical calculations from visual distortion.
 
@@ -60,10 +60,10 @@ The experience should feel astronomical and believable while remaining readable.
 - All calculations use UTC and the proleptic Gregorian calendar. Leap seconds are outside the product's required precision.
 - This is an educational Keplerian approximation, not an observatory or navigation tool. The interface must make that limitation available in an information panel.
 
-### 5.2 Analysis interval
+### 5.2 Display and cumulative intervals
 
 - Users may display and jump to any instant from `2000-01-01T00:00:00Z` through `4000-01-01T00:00:00Z`, inclusive.
-- Percentage calculations cover the half-open interval from `2000-01-01T00:00:00Z` up to, but not including, `4000-01-01T00:00:00Z`. This prevents double-counting the terminal instant.
+- At any displayed instant after the start, percentage calculations cover the half-open interval from `2000-01-01T00:00:00Z` up to the displayed instant. At exactly the start instant, the elapsed interval is zero and all seven displayed percentages are 0.0%.
 - The simulation starts at January 1, 2000 at 00:00:00 UTC on a new visit unless a previously saved in-range date is restored.
 - Reaching either endpoint while playing automatically pauses at that endpoint. The simulation never wraps around.
 
@@ -86,17 +86,17 @@ Labels and leader arrows—not individually inflated planet markers—are the re
 
 ### 5.5 Percentage calculation
 
-For each selectable planet, calculate how long each of the other seven planets is its nearest neighbor over the analysis interval.
+For each selectable planet, calculate how long each of the other seven planets has been its nearest neighbor from the range start through the displayed instant.
 
-- Percentages are time-weighted, not based on visual frames or the user's playback history.
+- Percentages are time-weighted and derived from the displayed date, not visual frames or the path the user took through playback.
 - Use a deterministic sampling interval no larger than six simulated hours. Refine detected nearest-neighbor transitions to within one simulated minute.
 - Run a convergence check with a finer interval before release. No displayed one-decimal-place percentage may change by more than 0.1 percentage point under the finer calculation.
-- Store the unrounded durations and calculate each percentage as `nearest duration / total analysis duration × 100`.
-- Show one decimal place by default. Use a consistent largest-remainder adjustment for display so visible values sum to exactly 100.0%.
-- Include every planet with a nonzero computed duration. Omit planets that are never nearest during the interval.
+- Store a reproducible transition timeline for the full supported range and calculate each live percentage as `nearest duration since range start / elapsed duration since range start × 100`.
+- Show all seven other planets, including those with zero accumulated duration.
+- Show one decimal place by default. At the range start all values are 0.0%. After elapsed time is nonzero, use a consistent largest-remainder adjustment so visible values sum to exactly 100.0%.
 - Sort entries by descending percentage, breaking equal displayed values by Mercury-to-Neptune order.
-- The percentage results are global to the fixed analysis interval; they do not change as the displayed date advances.
-- The interface must provide an explanation of the date range, sampling method, orbital model, and rounding behavior.
+- The percentages update with the displayed instant during forward and reverse playback and immediately after a date jump or reset.
+- The interface must provide an explanation of the cumulative interval, sampling method, orbital model, and rounding behavior.
 
 ## 6. User experience
 
@@ -106,6 +106,7 @@ For each selectable planet, calculate how long each of the other seven planets i
 - The initial date is January 1, 2000 at 00:00:00 UTC unless an in-range saved state is restored.
 - Time is paused.
 - No planet is selected, so no nearest-planet connecting line or selection card is visible.
+- Selecting a planet at the initial instant shows all seven alternatives at 0.0% until simulated time advances.
 - Equal-size labels identify every planet and use leader arrows that terminate at the corresponding physical position.
 
 ### 6.2 Selecting a planet
@@ -127,8 +128,8 @@ The panel contains:
 - a small recognizable icon of the selected planet;
 - the selected planet's name;
 - the current nearest planet's name and current physical center-to-center distance;
-- the fixed analysis range, “Jan 1, 2000–Jan 1, 4000”;
-- a list of all planets with a nonzero nearest-duration percentage;
+- the cumulative interval from Jan 1, 2000 through the displayed instant;
+- a list of all seven other planets and their current cumulative nearest-duration percentages;
 - each listed planet's name, small icon, percentage, and an accessible text equivalent;
 - a control or tooltip explaining the scientific and percentage methodology;
 - a close control.
@@ -207,7 +208,7 @@ Changing direction or speed must not change the displayed instant. Jumping to a 
 
 - Target smooth interaction at 60 frames per second on a contemporary desktop browser, with 30 frames per second as the minimum during the fastest playback.
 - Playback must be based on elapsed time rather than frame count so simulation time is stable across refresh rates.
-- Expensive long-range percentage analysis must not run on the animation thread. Results may be reproducibly precomputed from the same documented scientific model.
+- Expensive long-range transition analysis must not run on the animation thread. A reproducibly precomputed transition timeline from the documented scientific model may be queried at the displayed instant.
 - The same model version, instant, and selected planet must produce the same position, nearest planet, and percentage values across supported browsers within documented numeric tolerance.
 - Keep the model version and source metadata with generated percentage data so stale results cannot silently survive a model change.
 
@@ -216,7 +217,7 @@ Changing direction or speed must not change the displayed instant. Jumping to a 
 - Invalid custom speeds and dates show inline, actionable errors.
 - A date outside the supported range is rejected; it is not silently wrapped.
 - Reaching a boundary pauses playback and visibly explains why.
-- If percentage data cannot load, orbital playback remains available and the panel shows a retryable statistics error rather than fabricated values.
+- If transition data cannot load, orbital playback remains available and the panel shows a retryable statistics error rather than fabricated values.
 - If the scientific model or source metadata is missing, the build must fail rather than falling back to random or hard-coded positions.
 
 ## 12. Suggested implementation architecture
@@ -226,8 +227,8 @@ This section guides later implementation but does not authorize coding.
 - TypeScript, React, and Vite for a fully static GitHub Pages application.
 - HTML Canvas for the animated orbital scene and connection line.
 - A pure, separately testable astronomy module for positions, distances, and nearest-neighbor decisions.
-- A build-time or worker-based analysis path for deterministic percentage generation.
-- Versioned static data for orbital elements, source attribution, and precomputed percentages.
+- A build-time analysis path for deterministic nearest-transition generation.
+- Versioned static data for orbital elements, source attribution, and the precomputed nearest-transition timeline.
 - Accessible HTML controls and text content layered around the canvas; do not make the canvas the only interaction surface.
 - Repository-relative asset paths and a GitHub Actions Pages workflow; no application server or Cloudflare runtime.
 
@@ -243,7 +244,7 @@ The initial release is acceptable when all of the following are true:
 6. A user can select any planet from the scene or an accessible text list.
 7. Selection opens the top-left name-and-icon panel and immediately draws one line to the physically nearest other planet.
 8. The line and current-nearest text update continuously during forward and reverse playback.
-9. The panel shows every planet with a nonzero nearest-duration percentage for January 1, 2000 through January 1, 4000, and the displayed values sum to 100.0%.
+9. The panel starts all seven other planets at 0.0%, updates their cumulative nearest-duration percentages from January 1, 2000 through the displayed instant in real time, and sums to 100.0% whenever elapsed time is nonzero.
 10. Play, pause, reverse, all required presets, a validated custom multiplier, date/time jump, and reset work at both boundaries.
 11. Scientific calculations, percentage results, and visual transforms are deterministic and independently testable.
 12. The model limitations, source, date range, distance compression, sampling, and rounding are disclosed in the interface.

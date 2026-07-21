@@ -16,6 +16,7 @@ const THREE_HOURS_MS = 3 * 60 * 60 * 1_000;
 const ONE_MINUTE_MS = 60 * 1_000;
 
 type Durations = Record<PlanetId, Record<PlanetId, number>>;
+type Timelines = Record<PlanetId, Array<[number, PlanetId]>>;
 
 function emptyDurations(): Durations {
   return Object.fromEntries(
@@ -65,6 +66,9 @@ function calculate(stepMs: number) {
   const durations = emptyDurations();
   let previousTime = RANGE_START_MS;
   let previousNearest = nearestIdsAt(previousTime);
+  const timelines = Object.fromEntries(
+    PLANET_IDS.map((selected) => [selected, [[0, previousNearest[selected]]]]),
+  ) as Timelines;
   let samples = 1;
   let transitions = 0;
 
@@ -90,6 +94,10 @@ function calculate(stepMs: number) {
         );
         durations[selected][before] += transition - previousTime;
         durations[selected][after] += boundedTime - transition;
+        timelines[selected].push([
+          Math.round((transition - RANGE_START_MS) / ONE_MINUTE_MS),
+          after,
+        ]);
         transitions += 1;
       }
     }
@@ -100,7 +108,7 @@ function calculate(stepMs: number) {
     if (boundedTime === RANGE_END_MS) break;
   }
 
-  return { durations, samples, transitions };
+  return { durations, timelines, samples, transitions };
 }
 
 function roundForDisplay(
@@ -201,9 +209,12 @@ const output = {
     samples: result.samples,
     detectedTransitions: result.transitions,
     rounding: "largest remainder to one decimal place",
+    timelineEncoding:
+      "Each [minute offset, planet] starts a nearest-neighbor run measured from the interval start.",
     ...(convergence ? { convergence } : {}),
   },
   percentages,
+  timelines: result.timelines,
 };
 
 await writeFile(
