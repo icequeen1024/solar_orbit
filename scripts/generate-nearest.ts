@@ -6,17 +6,17 @@ import {
   PLANET_IDS,
   RANGE_END_MS,
   RANGE_START_MS,
-  nearestPlanetFromPositions,
   planetPositionAtDays,
   type PlanetId,
 } from "../lib/astronomy.ts";
+import { encodePlanetOrder } from "../lib/nearest-statistics.ts";
 
 const SIX_HOURS_MS = 6 * 60 * 60 * 1_000;
 const THREE_HOURS_MS = 3 * 60 * 60 * 1_000;
 const ONE_MINUTE_MS = 60 * 1_000;
 
 type Durations = Record<PlanetId, Record<PlanetId, number>>;
-type Timelines = Record<PlanetId, Array<[number, PlanetId]>>;
+type MutableRankedTimelines = Record<PlanetId, Array<[number, number]>>;
 
 function emptyDurations(): Durations {
   return Object.fromEntries(
@@ -32,45 +32,91 @@ function positionsAt(dateMs: number) {
   return PLANET_IDS.map((id) => planetPositionAtDays(id, days));
 }
 
-function nearestIdsAt(dateMs: number) {
+function sameOrder(a: readonly PlanetId[], b: readonly PlanetId[]) {
+  return a.every((id, index) => id === b[index]);
+}
+
+function rankedIdsFromPositions(
+  selected: PlanetId,
+  positions: ReturnType<typeof positionsAt>,
+) {
+  const selectedPosition = positions.find((position) => position.id === selected);
+  if (!selectedPosition) throw new Error(`Missing position for ${selected}.`);
+  return positions
+    .filter((position) => position.id !== selected)
+    .map((position) => {
+      const dx = selectedPosition.x - position.x;
+      const dy = selectedPosition.y - position.y;
+      const dz = selectedPosition.z - position.z;
+      return { id: position.id, distanceSquared: dx * dx + dy * dy + dz * dz };
+    })
+    .sort(
+      (a, b) =>
+        a.distanceSquared - b.distanceSquared ||
+        PLANET_IDS.indexOf(a.id) - PLANET_IDS.indexOf(b.id),
+    )
+    .map((entry) => entry.id);
+}
+
+function rankedIdsAt(dateMs: number) {
   const positions = positionsAt(dateMs);
   return Object.fromEntries(
     PLANET_IDS.map((selected) => [
       selected,
-      nearestPlanetFromPositions(selected, positions).planet.id,
+      rankedIdsFromPositions(selected, positions),
     ]),
-  ) as Record<PlanetId, PlanetId>;
+  ) as Record<PlanetId, PlanetId[]>;
 }
 
-function nearestIdForPlanet(selected: PlanetId, dateMs: number) {
-  return nearestPlanetFromPositions(selected, positionsAt(dateMs)).planet.id;
+function rankedIdsForPlanet(selected: PlanetId, dateMs: number) {
+  return rankedIdsFromPositions(selected, positionsAt(dateMs));
 }
 
-function refineTransition(
+function refineRankingTransition(
   selected: PlanetId,
   fromMs: number,
   toMs: number,
-  startingNearest: PlanetId,
+  startingOrder: readonly PlanetId[],
 ) {
   let low = fromMs;
   let high = toMs;
+  let highOrder = rankedIdsForPlanet(selected, high);
   while (high - low > ONE_MINUTE_MS) {
     const middle = low + (high - low) / 2;
-    if (nearestIdForPlanet(selected, middle) === startingNearest) low = middle;
-    else high = middle;
+    const middleOrder = rankedIdsForPlanet(selected, middle);
+    if (sameOrder(middleOrder, startingOrder)) low = middle;
+    else {
+      high = middle;
+      highOrder = middleOrder;
+    }
   }
-  return (low + high) / 2;
+  return { timeMs: high, order: highOrder };
+}
+
+function appendRankingTransition(
+  timeline: Array<[number, number]>,
+  timeMs: number,
+  order: readonly PlanetId[],
+) {
+  const offsetMinutes = Math.round((timeMs - RANGE_START_MS) / ONE_MINUTE_MS);
+  const orderCode = encodePlanetOrder(order);
+  const previous = timeline.at(-1);
+  if (previous?.[0] === offsetMinutes) previous[1] = orderCode;
+  else timeline.push([offsetMinutes, orderCode]);
 }
 
 function calculate(stepMs: number) {
   const durations = emptyDurations();
   let previousTime = RANGE_START_MS;
-  let previousNearest = nearestIdsAt(previousTime);
-  const timelines = Object.fromEntries(
-    PLANET_IDS.map((selected) => [selected, [[0, previousNearest[selected]]]]),
-  ) as Timelines;
+  let previousRankings = rankedIdsAt(previousTime);
+  const rankings = Object.fromEntries(
+    PLANET_IDS.map((selected) => [
+      selected,
+      [[0, encodePlanetOrder(previousRankings[selected])]],
+    ]),
+  ) as unknown as MutableRankedTimelines;
   let samples = 1;
-  let transitions = 0;
+  let rankingTransitions = 0;
 
   for (
     let currentTime = RANGE_START_MS + stepMs;
@@ -78,37 +124,45 @@ function calculate(stepMs: number) {
     currentTime += stepMs
   ) {
     const boundedTime = Math.min(currentTime, RANGE_END_MS);
-    const currentNearest = nearestIdsAt(boundedTime);
+    const currentRankings = rankedIdsAt(boundedTime);
 
     for (const selected of PLANET_IDS) {
-      const before = previousNearest[selected];
-      const after = currentNearest[selected];
-      if (before === after) {
-        durations[selected][before] += boundedTime - previousTime;
-      } else {
-        const transition = refineTransition(
+      let segmentStart = previousTime;
+      let segmentOrder = previousRankings[selected];
+      const finalOrder = currentRankings[selected];
+      let transitionsInSample = 0;
+
+      while (!sameOrder(segmentOrder, finalOrder)) {
+        const transition = refineRankingTransition(
           selected,
-          previousTime,
+          segmentStart,
           boundedTime,
-          before,
+          segmentOrder,
         );
-        durations[selected][before] += transition - previousTime;
-        durations[selected][after] += boundedTime - transition;
-        timelines[selected].push([
-          Math.round((transition - RANGE_START_MS) / ONE_MINUTE_MS),
-          after,
-        ]);
-        transitions += 1;
+        durations[selected][segmentOrder[0]] += transition.timeMs - segmentStart;
+        appendRankingTransition(
+          rankings[selected],
+          transition.timeMs,
+          transition.order,
+        );
+        rankingTransitions += 1;
+        segmentStart = transition.timeMs;
+        segmentOrder = transition.order;
+        transitionsInSample += 1;
+        if (transitionsInSample > 8) {
+          throw new Error(`Too many ${selected} ranking changes in one sample.`);
+        }
       }
+      durations[selected][segmentOrder[0]] += boundedTime - segmentStart;
     }
 
     previousTime = boundedTime;
-    previousNearest = currentNearest;
+    previousRankings = currentRankings;
     samples += 1;
     if (boundedTime === RANGE_END_MS) break;
   }
 
-  return { durations, timelines, samples, transitions };
+  return { durations, rankings, samples, rankingTransitions };
 }
 
 function roundForDisplay(
@@ -207,21 +261,21 @@ const output = {
     sampleHours: 6,
     transitionToleranceMinutes: 1,
     samples: result.samples,
-    detectedTransitions: result.transitions,
+    detectedRankingTransitions: result.rankingTransitions,
     rounding: "largest remainder to one decimal place",
-    timelineEncoding:
-      "Each [minute offset, planet] starts a nearest-neighbor run measured from the interval start.",
+    rankingEncoding:
+      "Each [minute offset, order code] starts a complete nearest-to-farthest candidate ordering. The code packs seven Mercury-to-Neptune indices into three bits each.",
     ...(convergence ? { convergence } : {}),
   },
   percentages,
-  timelines: result.timelines,
+  rankings: result.rankings,
 };
 
 await writeFile(
   new URL("../data/nearest-percentages.json", import.meta.url),
-  `${JSON.stringify(output, null, 2)}\n`,
+  `${JSON.stringify(output)}\n`,
 );
 
 console.log(
-  `Generated ${result.samples.toLocaleString()} samples and refined ${result.transitions.toLocaleString()} transitions.${convergence ? ` Convergence passed at ${convergence.maximumDisplayedDifference.toFixed(1)} percentage points.` : ""}`,
+  `Generated ${result.samples.toLocaleString()} samples and refined ${result.rankingTransitions.toLocaleString()} ranking transitions.${convergence ? ` Convergence passed at ${convergence.maximumDisplayedDifference.toFixed(1)} percentage points.` : ""}`,
 );

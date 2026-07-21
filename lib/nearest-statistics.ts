@@ -12,9 +12,12 @@ const DISPLAY_TENTHS_TOTAL = 1_000;
 export type PercentageEntry = { id: PlanetId; percentage: number };
 export type NearestTransition = readonly [offsetMinutes: number, id: PlanetId];
 export type NearestTimelines = Record<PlanetId, readonly NearestTransition[]>;
+export type RankedTransition = readonly [offsetMinutes: number, orderCode: number];
+export type RankedTimelines = Record<PlanetId, readonly RankedTransition[]>;
 
 export type PreparedNearestTimeline = {
   selected: PlanetId;
+  candidates: PlanetId[];
   starts: Float64Array;
   nearestIds: PlanetId[];
   cumulativeMinutes: Float64Array;
@@ -27,9 +30,19 @@ function planetOrder(id: PlanetId) {
 export function prepareNearestTimeline(
   selected: PlanetId,
   transitions: readonly NearestTransition[],
+  candidates: readonly PlanetId[] = PLANET_IDS.filter((id) => id !== selected),
 ): PreparedNearestTimeline {
   if (transitions.length === 0 || transitions[0][0] !== 0) {
     throw new Error(`The ${selected} timeline must begin at minute zero.`);
+  }
+  const candidateIds = [...candidates];
+  const candidateSet = new Set(candidateIds);
+  if (
+    candidateIds.length === 0 ||
+    candidateSet.size !== candidateIds.length ||
+    candidateIds.some((id) => !isPlanetId(id) || id === selected)
+  ) {
+    throw new Error(`The ${selected} timeline has invalid candidates.`);
   }
 
   const starts = new Float64Array(transitions.length);
@@ -47,7 +60,7 @@ export function prepareNearestTimeline(
     ) {
       throw new Error(`The ${selected} timeline is not strictly increasing.`);
     }
-    if (!isPlanetId(nearestId) || nearestId === selected) {
+    if (!isPlanetId(nearestId) || !candidateSet.has(nearestId)) {
       throw new Error(`The ${selected} timeline contains an invalid neighbor.`);
     }
 
@@ -66,7 +79,13 @@ export function prepareNearestTimeline(
       startMinutes - starts[index - 1];
   }
 
-  return { selected, starts, nearestIds, cumulativeMinutes };
+  return {
+    selected,
+    candidates: candidateIds,
+    starts,
+    nearestIds,
+    cumulativeMinutes,
+  };
 }
 
 export function prepareNearestTimelines(timelines: NearestTimelines) {
@@ -76,6 +95,83 @@ export function prepareNearestTimelines(timelines: NearestTimelines) {
       prepareNearestTimeline(selected, timelines[selected]),
     ]),
   ) as Record<PlanetId, PreparedNearestTimeline>;
+}
+
+export function encodePlanetOrder(order: readonly PlanetId[]) {
+  if (
+    order.length !== PLANET_IDS.length - 1 ||
+    new Set(order).size !== order.length ||
+    order.some((id) => !isPlanetId(id))
+  ) {
+    throw new Error("A ranked planet order must contain seven unique planets.");
+  }
+  return order.reduce((code, id) => (code << 3) | planetOrder(id), 0);
+}
+
+export function decodePlanetOrder(orderCode: number) {
+  if (
+    !Number.isSafeInteger(orderCode) ||
+    orderCode < 0 ||
+    orderCode >= 2 ** ((PLANET_IDS.length - 1) * 3)
+  ) {
+    throw new Error("The ranked planet order code is invalid.");
+  }
+  let remaining = orderCode;
+  const order = new Array<PlanetId>(PLANET_IDS.length - 1);
+  for (let index = order.length - 1; index >= 0; index -= 1) {
+    order[index] = PLANET_IDS[remaining & 0b111];
+    remaining >>>= 3;
+  }
+  if (new Set(order).size !== order.length) {
+    throw new Error("The ranked planet order contains duplicate planets.");
+  }
+  return order;
+}
+
+export function prepareFilteredNearestTimeline(
+  selected: PlanetId,
+  rankings: readonly RankedTransition[],
+  included: readonly PlanetId[],
+) {
+  if (rankings.length === 0 || rankings[0][0] !== 0) {
+    throw new Error(`The ${selected} ranking timeline must begin at minute zero.`);
+  }
+  const includedSet = new Set(included);
+  const candidates = PLANET_IDS.filter(
+    (id) => id !== selected && includedSet.has(id),
+  );
+  if (!includedSet.has(selected) || candidates.length === 0) {
+    throw new Error(`The ${selected} filtered timeline needs an included candidate.`);
+  }
+  const candidateSet = new Set(candidates);
+  const transitions: NearestTransition[] = [];
+
+  for (let index = 0; index < rankings.length; index += 1) {
+    const [startMinutes, orderCode] = rankings[index];
+    if (
+      !Number.isFinite(startMinutes) ||
+      startMinutes < 0 ||
+      (index > 0 && startMinutes <= rankings[index - 1][0])
+    ) {
+      throw new Error(`The ${selected} ranking timeline is not strictly increasing.`);
+    }
+    const order = decodePlanetOrder(orderCode);
+    if (
+      order.includes(selected) ||
+      !PLANET_IDS.every((id) => id === selected || order.includes(id))
+    ) {
+      throw new Error(`The ${selected} ranking timeline has an invalid order.`);
+    }
+    const nearest = order.find((id) => candidateSet.has(id));
+    if (!nearest) {
+      throw new Error(`The ${selected} ranking has no included candidate.`);
+    }
+    if (transitions.at(-1)?.[1] !== nearest) {
+      transitions.push([startMinutes, nearest]);
+    }
+  }
+
+  return prepareNearestTimeline(selected, transitions, candidates);
 }
 
 function activeTransitionIndex(starts: Float64Array, elapsedMinutes: number) {
@@ -95,7 +191,7 @@ export function percentagesAt(
 ): PercentageEntry[] {
   const boundedDateMs = Math.max(RANGE_START_MS, Math.min(RANGE_END_MS, dateMs));
   const elapsedMinutes = (boundedDateMs - RANGE_START_MS) / MINUTE_MS;
-  const candidates = PLANET_IDS.filter((id) => id !== timeline.selected);
+  const candidates = timeline.candidates;
 
   if (elapsedMinutes <= 0) {
     return candidates.map((id) => ({ id, percentage: 0 }));

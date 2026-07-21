@@ -12,10 +12,13 @@ which other planet is nearest at that instant and cumulatively since the start.
 - Forward and reverse playback, five speed presets, custom multipliers, and UTC
   date jumping.
 - Live cumulative nearest-duration percentages that begin at zero, use a
-  six-hour transition timeline refined to one simulated minute, and respond to
-  forward playback, reverse playback, and date jumps.
+  six-hour distance-order timeline refined to one simulated minute, and respond
+  to forward playback, reverse playback, date jumps, and included-planet filters.
+- Right-rail inclusion toggles that keep excluded planets visible but dimmed
+  while removing them from selection, nearest-neighbor lines, and statistics.
 - Keyboard-accessible planet selection and controls.
-- Device-local persistence for the selected planet, date, speed, and camera.
+- Device-local persistence for the selected planet, included planets, date,
+  speed, and camera.
 
 ## Local development
 

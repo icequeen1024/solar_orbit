@@ -299,15 +299,17 @@ export function physicalDistance(a: Point3, b: Point3) {
 export function nearestPlanetFromPositions(
   selected: PlanetId,
   positions: readonly PlanetPosition[],
+  included: readonly PlanetId[] = PLANET_IDS,
 ) {
   const selectedPosition = positions.find((position) => position.id === selected);
   if (!selectedPosition) throw new Error(`Missing position for ${selected}`);
+  const includedIds = new Set(included);
 
   let nearest: PlanetPosition | undefined;
   let distanceAu = Number.POSITIVE_INFINITY;
 
   for (const position of positions) {
-    if (position.id === selected) continue;
+    if (position.id === selected || !includedIds.has(position.id)) continue;
     const candidateDistance = physicalDistance(selectedPosition, position);
     const shouldReplaceTie =
       nearest &&

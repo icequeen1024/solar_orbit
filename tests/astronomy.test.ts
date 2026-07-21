@@ -68,6 +68,14 @@ test("nearest selection uses physical coordinates and stable planet-order ties",
     { id: "mars", x: 3, y: 0, z: 0, distanceFromSunAu: 3 },
   ];
   assert.equal(nearestPlanetFromPositions("earth", positions).planet.id, "mercury");
+  assert.equal(
+    nearestPlanetFromPositions("earth", positions, ["earth", "venus"]).planet.id,
+    "venus",
+  );
+  assert.throws(
+    () => nearestPlanetFromPositions("earth", positions, ["earth"]),
+    /No nearest planet/,
+  );
   assert.equal(physicalDistance(positions[0], positions[3]), 3);
 });
 

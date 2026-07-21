@@ -8,10 +8,13 @@ import {
   type PlanetId,
 } from "../lib/astronomy.ts";
 import {
+  decodePlanetOrder,
+  encodePlanetOrder,
   percentagesAt,
+  prepareFilteredNearestTimeline,
   prepareNearestTimeline,
-  prepareNearestTimelines,
   type NearestTransition,
+  type RankedTransition,
 } from "../lib/nearest-statistics.ts";
 
 type Statistics = {
@@ -20,13 +23,13 @@ type Statistics = {
     sampleHours: number;
     transitionToleranceMinutes: number;
     samples: number;
-    detectedTransitions: number;
+    detectedRankingTransitions: number;
   };
   percentages: Record<
     PlanetId,
     Array<{ id: PlanetId; percentage: number }>
   >;
-  timelines: Record<PlanetId, NearestTransition[]>;
+  rankings: Record<PlanetId, RankedTransition[]>;
 };
 
 const statistics = JSON.parse(
@@ -67,28 +70,39 @@ test("percentage rows are sorted descending", () => {
   }
 });
 
-test("transition timelines cover every planet and begin at the range start", () => {
+test("ranking timelines cover every planet and begin at the range start", () => {
   let transitionRuns = 0;
   for (const selected of PLANET_IDS) {
-    const timeline = statistics.timelines[selected];
+    const timeline = statistics.rankings[selected];
     assert.ok(timeline.length > 0);
     assert.deepEqual(timeline[0], [0, timeline[0][1]]);
     transitionRuns += timeline.length;
     for (let index = 0; index < timeline.length; index += 1) {
-      const [offsetMinutes, nearest] = timeline[index];
-      assert.notEqual(nearest, selected);
-      assert.ok(PLANET_IDS.includes(nearest));
+      const [offsetMinutes, orderCode] = timeline[index];
+      const order = decodePlanetOrder(orderCode);
+      assert.equal(order.length, 7);
+      assert.ok(!order.includes(selected));
+      assert.ok(PLANET_IDS.every((id) => id === selected || order.includes(id)));
       if (index > 0) assert.ok(offsetMinutes > timeline[index - 1][0]);
     }
   }
   assert.equal(
     transitionRuns,
-    statistics.method.detectedTransitions + PLANET_IDS.length,
+    statistics.method.detectedRankingTransitions + PLANET_IDS.length,
   );
 });
 
 test("live percentages start at zero and total 100 after time advances", () => {
-  const prepared = prepareNearestTimelines(statistics.timelines);
+  const prepared = Object.fromEntries(
+    PLANET_IDS.map((selected) => [
+      selected,
+      prepareFilteredNearestTimeline(
+        selected,
+        statistics.rankings[selected],
+        PLANET_IDS,
+      ),
+    ]),
+  ) as Record<PlanetId, ReturnType<typeof prepareFilteredNearestTimeline>>;
   for (const selected of PLANET_IDS) {
     const atStart = percentagesAt(prepared[selected], RANGE_START_MS);
     assert.equal(atStart.length, 7);
@@ -117,6 +131,67 @@ test("live percentages start at zero and total 100 after time advances", () => {
       statistics.percentages[selected],
     );
   }
+});
+
+test("ranked orders round-trip and excluded planets make no sampling contribution", () => {
+  const firstOrder: PlanetId[] = [
+    "mars",
+    "earth",
+    "mercury",
+    "venus",
+    "saturn",
+    "uranus",
+    "neptune",
+  ];
+  assert.deepEqual(decodePlanetOrder(encodePlanetOrder(firstOrder)), firstOrder);
+
+  const rankings: RankedTransition[] = [
+    [0, encodePlanetOrder(firstOrder)],
+    [60, encodePlanetOrder([
+      "earth",
+      "mars",
+      "mercury",
+      "venus",
+      "saturn",
+      "uranus",
+      "neptune",
+    ])],
+    [120, encodePlanetOrder([
+      "mercury",
+      "earth",
+      "mars",
+      "venus",
+      "saturn",
+      "uranus",
+      "neptune",
+    ])],
+  ];
+  const timeline = prepareFilteredNearestTimeline(
+    "jupiter",
+    rankings,
+    ["mercury", "mars", "jupiter"],
+  );
+  assert.deepEqual(timeline.candidates, ["mercury", "mars"]);
+  assert.deepEqual(timeline.nearestIds, ["mars", "mercury"]);
+  assert.deepEqual(
+    percentagesAt(timeline, RANGE_START_MS + 180 * 60_000),
+    [
+      { id: "mars", percentage: 66.7 },
+      { id: "mercury", percentage: 33.3 },
+    ],
+  );
+});
+
+test("Jupiter pair filtering exposes Mercury's head-to-head win over Mars", () => {
+  const timeline = prepareFilteredNearestTimeline(
+    "jupiter",
+    statistics.rankings.jupiter,
+    ["mercury", "mars", "jupiter"],
+  );
+  assert.deepEqual(percentagesAt(timeline, RANGE_END_MS), [
+    { id: "mercury", percentage: 54.2 },
+    { id: "mars", percentage: 45.8 },
+  ]);
 });
 
 test("a single nearest run displays 100% and rewinding is date-deterministic", () => {

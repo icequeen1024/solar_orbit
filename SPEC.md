@@ -1,10 +1,10 @@
 # Solar Orbit — Product Specification
 
-Version: 1.0
+Version: 1.1
 
 Status: Approved; implementation in progress
 
-Date: July 20, 2026
+Date: July 21, 2026
 
 ## 1. Product summary
 
@@ -25,9 +25,10 @@ The experience should feel astronomical and believable while remaining readable.
 | Distance presentation | Compressed for readability; not shown at literal distance scale |
 | Body presentation | All nine bodies use one uniform visual size scale so their diameter ratios remain physically proportional; this includes the Sun |
 | Labels | Equal typography and visual weight, with a leader arrow pointing to each body's position |
-| Selection | Planets are selectable; the Sun is displayed but is not a selectable planet or a nearest-planet candidate |
+| Selection | Included planets are selectable; the Sun is displayed but is not a selectable planet or a nearest-planet candidate |
+| Planet filtering | The right-side planet rail can include or exclude planets from selection, nearest-neighbor results, and cumulative statistics; excluded planets remain visible but dimmed |
 | Nearest connection | Updates continuously while simulated time advances |
-| Cumulative percentages | Start all seven alternatives at 0.0% on January 1, 2000 and update their nearest-duration shares through the displayed instant |
+| Cumulative percentages | Start all other included alternatives at 0.0% on January 1, 2000 and update their nearest-duration shares through the displayed instant |
 
 ## 3. Goals
 
@@ -79,20 +80,22 @@ Labels and leader arrows—not individually inflated planet markers—are the re
 ### 5.4 Nearest-planet calculation
 
 - “Nearest” means the smallest center-to-center Euclidean distance in the physical heliocentric coordinate system at the displayed instant.
-- The selected planet and the Sun are excluded. The candidates are the other seven planets.
+- The selected planet, the Sun, and user-excluded planets are excluded. The candidates are the other currently included planets.
+- At least two planets must remain included so every selected planet has at least one candidate. Excluding the selected planet clears the selection.
 - Screen-space positions and compressed display distances must never be used to decide which planet is nearest.
 - If two candidates are equal within the numeric tolerance, use a documented, stable order by distance and then planet order from Mercury through Neptune. A tie indicator may be shown, but the connecting line must remain deterministic.
 - At every animation update, recompute or interpolate the physical positions, determine the current nearest planet, and update the line and selected-planet panel together.
 
 ### 5.5 Percentage calculation
 
-For each selectable planet, calculate how long each of the other seven planets has been its nearest neighbor from the range start through the displayed instant.
+For each selectable planet, calculate how long each of the other currently included planets has been its nearest neighbor from the range start through the displayed instant.
 
 - Percentages are time-weighted and derived from the displayed date, not visual frames or the path the user took through playback.
-- Use a deterministic sampling interval no larger than six simulated hours. Refine detected nearest-neighbor transitions to within one simulated minute.
+- Use a deterministic sampling interval no larger than six simulated hours. Refine detected distance-order transitions to within one simulated minute.
 - Run a convergence check with a finer interval before release. No displayed one-decimal-place percentage may change by more than 0.1 percentage point under the finer calculation.
-- Store a reproducible transition timeline for the full supported range and calculate each live percentage as `nearest duration since range start / elapsed duration since range start × 100`.
-- Show all seven other planets, including those with zero accumulated duration.
+- Store a reproducible distance-order timeline for the full supported range so the nearest candidate can be deterministically re-evaluated for any valid included-planet set. Calculate each live percentage as `nearest duration since range start / elapsed duration since range start × 100`.
+- Changing the included-planet set recomputes the entire displayed interval from January 1, 2000 with the new candidate set. Results must not depend on when or in which playback direction the user changed a filter.
+- Show every other included planet, including those with zero accumulated duration. Excluded planets make no sampling contribution and do not appear in the percentage list.
 - Show one decimal place by default. At the range start all values are 0.0%. After elapsed time is nonzero, use a consistent largest-remainder adjustment so visible values sum to exactly 100.0%.
 - Sort entries by descending percentage, breaking equal displayed values by Mercury-to-Neptune order.
 - The percentages update with the displayed instant during forward and reverse playback and immediately after a date jump or reset.
@@ -103,6 +106,7 @@ For each selectable planet, calculate how long each of the other seven planets h
 ### 6.1 Initial state
 
 - The full system view opens with the Sun centered and all eight orbital paths represented.
+- All eight planets initially participate in nearest-neighbor calculations.
 - The initial date is January 1, 2000 at 00:00:00 UTC unless an in-range saved state is restored.
 - Time is paused.
 - No planet is selected, so no nearest-planet connecting line or selection card is visible.
@@ -112,6 +116,7 @@ For each selectable planet, calculate how long each of the other seven planets h
 ### 6.2 Selecting a planet
 
 - A planet can be selected by clicking its rendered body, label, or leader arrow.
+- An excluded planet cannot be selected until it is included again.
 - Selecting a planet immediately:
   - emphasizes the selected body and label;
   - draws a line from it to its currently nearest planet;
@@ -129,7 +134,7 @@ The panel contains:
 - the selected planet's name;
 - the current nearest planet's name and current physical center-to-center distance;
 - the cumulative interval from Jan 1, 2000 through the displayed instant;
-- a list of all seven other planets and their current cumulative nearest-duration percentages;
+- a list of all other included planets and their current cumulative nearest-duration percentages;
 - each listed planet's name, small icon, percentage, and an accessible text equivalent;
 - a control or tooltip explaining the scientific and percentage methodology;
 - a close control.
@@ -175,6 +180,15 @@ Changing direction or speed must not change the displayed instant. Jumping to a 
 - Zoom and pan affect the scene transform, not scientific calculations.
 - Labels remain readable during navigation and continue pointing to the correct bodies.
 
+### 6.7 Planet inclusion controls
+
+- The right-side planet rail provides a separate included/excluded control for every planet alongside its selection control.
+- Excluded planets remain visible in the scene so the Solar System stays spatially complete, but their orbits, bodies, labels, and rail rows are visibly dimmed.
+- Excluded planets cannot be selected, cannot receive the nearest-neighbor line, and make no contribution to cumulative nearest-duration percentages.
+- Excluding the selected planet clears the selection. At least two planets must remain included.
+- An “include all” action restores the default eight-planet candidate set.
+- Inclusion changes take effect immediately without pausing or changing the displayed simulation time.
+
 ## 7. Layout and visual direction
 
 - Desktop-first target: a minimum supported viewport of 1280 × 720 CSS pixels.
@@ -199,7 +213,7 @@ Changing direction or speed must not change the displayed instant. Jumping to a 
 
 ## 9. Persistence and URL behavior
 
-- Persist the last valid date, direction, speed, camera view, and selected planet locally.
+- Persist the last valid date, direction, speed, camera view, selected planet, and included-planet set locally.
 - Restored values must be validated and clamped to the fixed range.
 - No account, server-side persistence, or user tracking is required.
 - A future shareable URL is permitted but is not required for the initial release.
@@ -208,7 +222,7 @@ Changing direction or speed must not change the displayed instant. Jumping to a 
 
 - Target smooth interaction at 60 frames per second on a contemporary desktop browser, with 30 frames per second as the minimum during the fastest playback.
 - Playback must be based on elapsed time rather than frame count so simulation time is stable across refresh rates.
-- Expensive long-range transition analysis must not run on the animation thread. A reproducibly precomputed transition timeline from the documented scientific model may be queried at the displayed instant.
+- Expensive long-range transition analysis must not run on the animation thread. A reproducibly precomputed distance-order timeline from the documented scientific model may be filtered for the included planets and queried at the displayed instant.
 - The same model version, instant, and selected planet must produce the same position, nearest planet, and percentage values across supported browsers within documented numeric tolerance.
 - Keep the model version and source metadata with generated percentage data so stale results cannot silently survive a model change.
 
@@ -242,14 +256,15 @@ The initial release is acceptable when all of the following are true:
 4. Orbital distances are visibly disclosed as compressed, and no screen-space distance is used for nearest calculations.
 5. Every planet has an equal-style label and an arrow pointing to its position.
 6. A user can select any planet from the scene or an accessible text list.
-7. Selection opens the top-left name-and-icon panel and immediately draws one line to the physically nearest other planet.
+7. Selection opens the top-left name-and-icon panel and immediately draws one line to the physically nearest included planet.
 8. The line and current-nearest text update continuously during forward and reverse playback.
-9. The panel starts all seven other planets at 0.0%, updates their cumulative nearest-duration percentages from January 1, 2000 through the displayed instant in real time, and sums to 100.0% whenever elapsed time is nonzero.
+9. The panel starts all other included planets at 0.0%, updates their cumulative nearest-duration percentages from January 1, 2000 through the displayed instant in real time, and sums to 100.0% whenever elapsed time is nonzero.
 10. Play, pause, reverse, all required presets, a validated custom multiplier, date/time jump, and reset work at both boundaries.
 11. Scientific calculations, percentage results, and visual transforms are deterministic and independently testable.
 12. The model limitations, source, date range, distance compression, sampling, and rounding are disclosed in the interface.
 13. Keyboard selection, focus, contrast, reduced-motion behavior, and text alternatives meet the accessibility requirements.
 14. Automated tests cover orbital fixtures, range boundaries, nearest-neighbor decisions, percentage totals, tie behavior, controls, and core selection flows.
+15. The planet rail can exclude and re-include planets; excluded planets are dimmed, cannot be selected or become nearest, and make no contribution to the recomputed cumulative percentages.
 
 ## 14. Explicitly deferred decisions
 

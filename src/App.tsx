@@ -29,8 +29,8 @@ import {
 } from "../lib/astronomy";
 import {
   percentagesAt,
-  prepareNearestTimelines,
-  type NearestTimelines,
+  prepareFilteredNearestTimeline,
+  type RankedTimelines,
 } from "../lib/nearest-statistics";
 import { playbackDirectionFromBoundary } from "../lib/playback";
 
@@ -39,9 +39,9 @@ type StatisticsFile = {
     sampleHours: number;
     transitionToleranceMinutes: number;
     samples: number;
-    detectedTransitions: number;
+    detectedRankingTransitions: number;
   };
-  timelines: NearestTimelines;
+  rankings: RankedTimelines;
 };
 
 type Camera = { zoom: number; panX: number; panY: number };
@@ -54,7 +54,6 @@ type HitRegion = {
 };
 
 const statistics = nearestStatisticsJson as unknown as StatisticsFile;
-const preparedTimelines = prepareNearestTimelines(statistics.timelines);
 const STORAGE_KEY = "solar-orbit-state-v1";
 const MAX_CUSTOM_MULTIPLIER = 1_000_000_000_000;
 const YEAR_SECONDS = 365.25 * 24 * 60 * 60;
@@ -217,6 +216,7 @@ function OrbitCanvas({
   positions,
   selected,
   nearest,
+  included,
   camera,
   onCameraChange,
   onSelect,
@@ -225,6 +225,7 @@ function OrbitCanvas({
   positions: readonly PlanetPosition[];
   selected: PlanetId | null;
   nearest: PlanetId | null;
+  included: ReadonlySet<PlanetId>;
   camera: Camera;
   onCameraChange: (camera: Camera) => void;
   onSelect: (planet: PlanetId) => void;
@@ -305,6 +306,8 @@ function OrbitCanvas({
 
     for (const planet of PLANETS) {
       const path = orbitPaths[planet.id];
+      context.save();
+      context.globalAlpha = included.has(planet.id) ? 1 : 0.22;
       context.strokeStyle =
         planet.id === selected
           ? "rgba(227, 181, 85, 0.48)"
@@ -317,6 +320,7 @@ function OrbitCanvas({
         else context.lineTo(screen.x, screen.y);
       });
       context.stroke();
+      context.restore();
     }
 
     const selectedPosition = positions.find((position) => position.id === selected);
@@ -362,11 +366,14 @@ function OrbitCanvas({
     const hitRegions: HitRegion[] = [];
     for (const position of positions) {
       const planet = getPlanet(position.id);
+      const isIncluded = included.has(position.id);
       const body = toScreen(position);
       const bodyRadius = planet.radiusKm * bodyScale;
       const isSelected = position.id === selected;
       const isNearest = position.id === nearest;
       const isHovered = position.id === hovered;
+      context.save();
+      context.globalAlpha = isIncluded ? 1 : 0.22;
 
       if (isSelected || isNearest || isHovered) {
         context.strokeStyle = isSelected ? "#f0c565" : "rgba(240, 197, 101, 0.72)";
@@ -447,15 +454,18 @@ function OrbitCanvas({
       context.textBaseline = "middle";
       context.fillText(planet.name.toUpperCase(), labelX + 11, labelY + labelHeight / 2);
 
-      hitRegions.push({
-        id: position.id,
-        body,
-        label: { x: labelX, y: labelY, width: labelWidth, height: labelHeight },
-        line: { start: arrowStart, end: arrowEnd },
-      });
+      context.restore();
+      if (isIncluded) {
+        hitRegions.push({
+          id: position.id,
+          body,
+          label: { x: labelX, y: labelY, width: labelWidth, height: labelHeight },
+          line: { start: arrowStart, end: arrowEnd },
+        });
+      }
     }
     hitRegionsRef.current = hitRegions;
-  }, [camera, dimensions, hovered, nearest, orbitPaths, positions, selected]);
+  }, [camera, dimensions, hovered, included, nearest, orbitPaths, positions, selected]);
 
   const findHit = useCallback((x: number, y: number) => {
     for (const region of [...hitRegionsRef.current].reverse()) {
@@ -533,7 +543,7 @@ function OrbitCanvas({
     <canvas
       ref={canvasRef}
       className={hovered ? "orbit-canvas orbit-canvas--hover" : "orbit-canvas"}
-      aria-label="Interactive top-down map of the Sun and eight planets. Use the planet list for keyboard selection."
+      aria-label="Interactive top-down map of the Sun and eight planets. Excluded planets are dimmed; use the planet controls for keyboard selection."
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}
@@ -549,6 +559,7 @@ function OrbitCanvas({
 export default function App() {
   const [dateMs, setDateMs] = useState(RANGE_START_MS);
   const [selected, setSelected] = useState<PlanetId | null>(null);
+  const [excludedPlanets, setExcludedPlanets] = useState<PlanetId[]>([]);
   const [playing, setPlaying] = useState(false);
   const [direction, setDirection] = useState<1 | -1>(1);
   const [speedId, setSpeedId] = useState("year");
@@ -565,16 +576,36 @@ export default function App() {
   const previousNearestRef = useRef<PlanetId | null>(null);
 
   const positions = useMemo(() => allPlanetPositions(dateMs), [dateMs]);
+  const excludedSet = useMemo(() => new Set(excludedPlanets), [excludedPlanets]);
+  const includedIds = useMemo(
+    () => PLANET_IDS.filter((id) => !excludedSet.has(id)),
+    [excludedSet],
+  );
+  const includedSet = useMemo(() => new Set(includedIds), [includedIds]);
   const nearestResult = useMemo(
-    () => (selected ? nearestPlanetFromPositions(selected, positions) : null),
-    [positions, selected],
+    () =>
+      selected
+        ? nearestPlanetFromPositions(selected, positions, includedIds)
+        : null,
+    [includedIds, positions, selected],
   );
   const nearestId = nearestResult?.planet.id ?? null;
   const distance = nearestResult ? formatDistance(nearestResult.distanceAu) : null;
   const selectedPlanet = selected ? getPlanet(selected) : null;
+  const filteredTimeline = useMemo(
+    () =>
+      selected
+        ? prepareFilteredNearestTimeline(
+            selected,
+            statistics.rankings[selected],
+            includedIds,
+          )
+        : null,
+    [includedIds, selected],
+  );
   const livePercentages = useMemo(
-    () => (selected ? percentagesAt(preparedTimelines[selected], dateMs) : []),
-    [dateMs, selected],
+    () => (filteredTimeline ? percentagesAt(filteredTimeline, dateMs) : []),
+    [dateMs, filteredTimeline],
   );
 
   useEffect(() => {
@@ -589,13 +620,27 @@ export default function App() {
           speedMultiplier?: unknown;
           customMultiplier?: unknown;
           camera?: Partial<Camera>;
+          excludedPlanets?: unknown;
         };
+        const restoredExcluded =
+          Array.isArray(parsed.excludedPlanets) &&
+          parsed.excludedPlanets.every(isPlanetId) &&
+          new Set(parsed.excludedPlanets).size === parsed.excludedPlanets.length &&
+          parsed.excludedPlanets.length <= PLANET_IDS.length - 2
+            ? parsed.excludedPlanets
+            : [];
+        setExcludedPlanets(restoredExcluded);
         if (typeof parsed.dateMs === "number" && Number.isFinite(parsed.dateMs)) {
           const restoredDate = clampToRange(parsed.dateMs);
           setDateMs(restoredDate);
           setJumpValue(toDateTimeInput(restoredDate));
         }
-        if (isPlanetId(parsed.selected)) setSelected(parsed.selected);
+        if (
+          isPlanetId(parsed.selected) &&
+          !restoredExcluded.includes(parsed.selected)
+        ) {
+          setSelected(parsed.selected);
+        }
         if (parsed.direction === 1 || parsed.direction === -1) {
           setDirection(parsed.direction);
         }
@@ -645,11 +690,21 @@ export default function App() {
           speedMultiplier,
           customMultiplier,
           camera,
+          excludedPlanets,
         }),
       );
     }, 350);
     return () => window.clearTimeout(timeout);
-  }, [camera, customMultiplier, dateMs, direction, selected, speedId, speedMultiplier]);
+  }, [
+    camera,
+    customMultiplier,
+    dateMs,
+    direction,
+    excludedPlanets,
+    selected,
+    speedId,
+    speedMultiplier,
+  ]);
 
   useEffect(() => {
     if (!playing) return;
@@ -755,6 +810,27 @@ export default function App() {
     setBoundaryMessage("");
   };
 
+  const togglePlanetInclusion = (id: PlanetId) => {
+    const planetName = getPlanet(id).name;
+    if (excludedSet.has(id)) {
+      setExcludedPlanets((current) => current.filter((planet) => planet !== id));
+      setLiveMessage(`${planetName} is included in nearest-neighbor results.`);
+      return;
+    }
+    if (includedIds.length <= 2) {
+      setLiveMessage("At least two planets must remain included.");
+      return;
+    }
+    setExcludedPlanets((current) => [...current, id]);
+    if (selected === id) setSelected(null);
+    setLiveMessage(`${planetName} is excluded from nearest-neighbor results.`);
+  };
+
+  const includeAllPlanets = () => {
+    setExcludedPlanets([]);
+    setLiveMessage("All planets are included in nearest-neighbor results.");
+  };
+
   const currentSpeed =
     SPEED_PRESETS.find((entry) => entry.id === speedId)?.shortLabel ??
     `${speedMultiplier.toLocaleString()}×`;
@@ -767,6 +843,7 @@ export default function App() {
           positions={positions}
           selected={selected}
           nearest={nearestId}
+          included={includedSet}
           camera={camera}
           onCameraChange={setCamera}
           onSelect={setSelected}
@@ -825,7 +902,7 @@ export default function App() {
           </div>
 
           <div className="nearest-summary">
-            <p>Nearest right now</p>
+            <p>Nearest included planet</p>
             <div>
               <BodyIcon id={nearestId} size={26} />
               <strong>{getPlanet(nearestId).name}</strong>
@@ -836,8 +913,11 @@ export default function App() {
 
           <div className="percentage-heading">
             <div>
-              <p>Nearest since start</p>
-              <span>{formatPercentageRange(dateMs)}</span>
+              <p>Nearest among included</p>
+              <span>
+                {formatPercentageRange(dateMs)} · {livePercentages.length}{" "}
+                candidate{livePercentages.length === 1 ? "" : "s"}
+              </span>
             </div>
             <button type="button" onClick={() => setMethodsOpen(true)}>
               How?
@@ -868,22 +948,67 @@ export default function App() {
         </aside>
       )}
 
-      <nav className="planet-rail" aria-label="Select a planet">
-        <p>Planets</p>
-        {PLANETS.map((planet, index) => (
-          <button
-            key={planet.id}
-            type="button"
-            className={selected === planet.id ? "is-selected" : ""}
-            aria-pressed={selected === planet.id}
-            onClick={() => setSelected(planet.id)}
-          >
-            <span className="planet-rail__number">{String(index + 1).padStart(2, "0")}</span>
-            <BodyIcon id={planet.id} size={18} />
-            <span>{planet.name}</span>
-          </button>
-        ))}
-      </nav>
+      <aside className="planet-rail" aria-label="Planet inclusion and selection">
+        <div className="planet-rail__heading">
+          <div>
+            <p>Planets</p>
+            <span>{includedIds.length} / {PLANET_IDS.length} included</span>
+          </div>
+          {excludedPlanets.length > 0 ? (
+            <button type="button" onClick={includeAllPlanets}>
+              Include all
+            </button>
+          ) : null}
+        </div>
+        <div className="planet-rail__rows">
+          {PLANETS.map((planet, index) => {
+            const isIncluded = includedSet.has(planet.id);
+            const inclusionLocked = isIncluded && includedIds.length <= 2;
+            return (
+              <div
+                key={planet.id}
+                className={`planet-rail__row${isIncluded ? "" : " is-excluded"}`}
+              >
+                <button
+                  type="button"
+                  className={`planet-rail__select${selected === planet.id ? " is-selected" : ""}`}
+                  aria-label={`Select ${planet.name}`}
+                  aria-pressed={selected === planet.id}
+                  disabled={!isIncluded}
+                  onClick={() => setSelected(planet.id)}
+                >
+                  <span className="planet-rail__number">
+                    {String(index + 1).padStart(2, "0")}
+                  </span>
+                  <BodyIcon id={planet.id} size={18} />
+                  <span>{planet.name}</span>
+                </button>
+                <label
+                  className="planet-rail__toggle"
+                  title={
+                    inclusionLocked
+                      ? "At least two planets must remain included"
+                      : `${isIncluded ? "Exclude" : "Include"} ${planet.name}`
+                  }
+                >
+                  <input
+                    type="checkbox"
+                    checked={isIncluded}
+                    disabled={inclusionLocked}
+                    onChange={() => togglePlanetInclusion(planet.id)}
+                  />
+                  <span className="planet-rail__toggle-visual" aria-hidden="true">
+                    <i />
+                  </span>
+                  <span className="sr-only">
+                    Include {planet.name} in nearest-neighbor results
+                  </span>
+                </label>
+              </div>
+            );
+          })}
+        </div>
+      </aside>
 
       <div className="scale-disclosure">
         <span className="scale-disclosure__line" />
@@ -1055,13 +1180,15 @@ export default function App() {
                 <span>03</span>
                 <h3>Time percentages</h3>
                 <p>
-                  A nearest-neighbor timeline from 2000–4000 was sampled every{" "}
+                  A complete distance-order timeline from 2000–4000 was sampled every{" "}
                   {statistics.method.sampleHours} hours across{" "}
                   {statistics.method.samples.toLocaleString()} samples. Changes were
                   refined to within {statistics.method.transitionToleranceMinutes} minute.
                   The panel totals time from Jan 1, 2000 to the displayed instant, so it
                   grows forward, rewinds in reverse, and updates after a date jump. Values
-                  start at zero and then round to total exactly 100.0%.
+                  start at zero and then round to total exactly 100.0%. Planet filters
+                  re-evaluate that entire interval using only included candidates, so
+                  excluded planets make no sampling contribution.
                 </p>
               </article>
               <article className="methods-warning">
