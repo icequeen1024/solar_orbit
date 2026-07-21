@@ -27,6 +27,7 @@ import {
   type PlanetPosition,
   type Point3,
 } from "../lib/astronomy";
+import { playbackDirectionFromBoundary } from "../lib/playback";
 
 type PercentageEntry = { id: PlanetId; percentage: number };
 type StatisticsFile = {
@@ -880,7 +881,12 @@ export default function App() {
             className="play-button"
             aria-label={playing ? "Pause simulation" : "Play simulation"}
             onClick={() => {
-              setPlaying((current) => !current);
+              if (!playing) {
+                setDirection((current) =>
+                  playbackDirectionFromBoundary(dateMs, current),
+                );
+              }
+              setPlaying(!playing);
               setBoundaryMessage("");
             }}
           >
